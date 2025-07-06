@@ -283,7 +283,7 @@ export default function Admin() {
   const fetchOrderDetails = useMutation({
     mutationFn: async (id: number) => {
       const response = await apiRequest("GET", `/api/orders/${id}`);
-      return response;
+      return response.json();
     },
     onSuccess: (data: OrderWithItems) => {
       setSelectedOrder(data);
