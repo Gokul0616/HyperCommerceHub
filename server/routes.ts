@@ -49,13 +49,20 @@ const requireAdmin = (req: Request, res: Response, next: any) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Session middleware
+  // Session middleware with improved persistence
   app.use(
     session({
-      secret: process.env.SESSION_SECRET || "your-secret-key",
+      secret: process.env.SESSION_SECRET || "hyperpure-demo-secret-key",
       resave: false,
       saveUninitialized: false,
-      cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }, // 24 hours
+      cookie: { 
+        secure: false, 
+        httpOnly: true,
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        sameSite: 'lax'
+      },
+      rolling: true, // Reset expiration on each request
+      name: 'hyperpure.sid', // Custom session name
     }),
   );
 
