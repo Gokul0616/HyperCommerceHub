@@ -1,0 +1,197 @@
+import requests
+import sys
+import json
+from datetime import datetime
+
+class HyperPureAPITester:
+    def __init__(self, base_url="http://localhost:5000"):
+        self.base_url = base_url
+        self.session = requests.Session()
+        self.tests_run = 0
+        self.tests_passed = 0
+        self.admin_credentials = {
+            "email": "admin@hyperpure.com",
+            "password": "admin123"
+        }
+        self.customer_credentials = {
+            "email": "customer@example.com",
+            "password": "customer123"
+        }
+
+    def run_test(self, name, method, endpoint, expected_status, data=None, auth_required=False, admin_required=False):
+        """Run a single API test"""
+        url = f"{self.base_url}/api/{endpoint}"
+        headers = {'Content-Type': 'application/json'}
+        
+        self.tests_run += 1
+        print(f"\n🔍 Testing {name}...")
+        
+        try:
+            if method == 'GET':
+                response = self.session.get(url, headers=headers)
+            elif method == 'POST':
+                response = self.session.post(url, json=data, headers=headers)
+            elif method == 'PUT':
+                response = self.session.put(url, json=data, headers=headers)
+            elif method == 'DELETE':
+                response = self.session.delete(url, headers=headers)
+
+            success = response.status_code == expected_status
+            if success:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code}")
+                try:
+                    return success, response.json()
+                except:
+                    return success, {}
+            else:
+                print(f"❌ Failed - Expected {expected_status}, got {response.status_code}")
+                try:
+                    print(f"Response: {response.json()}")
+                except:
+                    print(f"Response: {response.text}")
+                return False, {}
+
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            return False, {}
+
+    def login(self, email, password):
+        """Test login functionality"""
+        success, response = self.run_test(
+            "Login",
+            "POST",
+            "auth/login",
+            200,
+            data={"email": email, "password": password}
+        )
+        if success and 'user' in response:
+            print(f"Logged in as {response['user']['email']} with role {response['user']['role']}")
+            return True
+        return False
+
+    def get_current_user(self):
+        """Test getting current user info"""
+        success, response = self.run_test(
+            "Get Current User",
+            "GET",
+            "auth/me",
+            200
+        )
+        if success and 'user' in response:
+            print(f"Current user: {response['user']['email']}")
+            return response['user']
+        return None
+
+    def logout(self):
+        """Test logout functionality"""
+        success, _ = self.run_test(
+            "Logout",
+            "POST",
+            "auth/logout",
+            200
+        )
+        return success
+
+    def test_admin_access(self):
+        """Test admin-specific endpoints"""
+        # Test admin stats
+        success, response = self.run_test(
+            "Admin Stats",
+            "GET",
+            "admin/stats",
+            200
+        )
+        if not success:
+            return False
+
+        # Test admin orders
+        success, response = self.run_test(
+            "Admin Orders",
+            "GET",
+            "admin/orders",
+            200
+        )
+        if not success:
+            return False
+
+        return True
+
+    def test_order_details(self, order_id):
+        """Test getting order details"""
+        success, response = self.run_test(
+            "Order Details",
+            "GET",
+            f"orders/{order_id}",
+            200
+        )
+        return success, response
+
+def main():
+    # Setup
+    tester = HyperPureAPITester("http://localhost:5000")
+    
+    print("=== Testing HyperPure API ===")
+    
+    # Test 1: Admin Login
+    print("\n=== Testing Admin Login ===")
+    if not tester.login(tester.admin_credentials["email"], tester.admin_credentials["password"]):
+        print("❌ Admin login failed, stopping tests")
+        return 1
+    
+    # Test 2: Get Current User (Admin)
+    print("\n=== Testing Get Current User (Admin) ===")
+    admin_user = tester.get_current_user()
+    if not admin_user:
+        print("❌ Failed to get admin user info")
+        return 1
+    
+    # Test 3: Admin Access
+    print("\n=== Testing Admin Access ===")
+    if not tester.test_admin_access():
+        print("❌ Admin access test failed")
+    
+    # Test 4: Get Admin Orders
+    print("\n=== Testing Admin Orders ===")
+    success, orders = tester.run_test(
+        "Admin Orders",
+        "GET",
+        "admin/orders",
+        200
+    )
+    
+    # Test 5: Order Details
+    if success and orders and len(orders) > 0:
+        print("\n=== Testing Order Details ===")
+        order_id = orders[0]["id"]
+        success, order_details = tester.test_order_details(order_id)
+        if not success:
+            print(f"❌ Failed to get order details for order {order_id}")
+    
+    # Test 6: Admin Logout
+    print("\n=== Testing Admin Logout ===")
+    if not tester.logout():
+        print("❌ Admin logout failed")
+    
+    # Test 7: Customer Login
+    print("\n=== Testing Customer Login ===")
+    if not tester.login(tester.customer_credentials["email"], tester.customer_credentials["password"]):
+        print("❌ Customer login failed")
+    
+    # Test 8: Get Current User (Customer)
+    print("\n=== Testing Get Current User (Customer) ===")
+    customer_user = tester.get_current_user()
+    if not customer_user:
+        print("❌ Failed to get customer user info")
+    
+    # Test 9: Customer Logout
+    print("\n=== Testing Customer Logout ===")
+    if not tester.logout():
+        print("❌ Customer logout failed")
+    
+    # Print results
+    print(f"\n📊 Tests passed: {tester.tests_passed}/{tester.tests_run}")
+    return 0 if tester.tests_passed == tester.tests_run else 1
+
+if __name__ == "__main__":
+    sys.exit(main())
