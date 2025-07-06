@@ -87,7 +87,7 @@ export default function Admin() {
     defaultValues: {
       name: "",
       description: "",
-      categoryId: 0,
+      categoryId: undefined,
       price: "",
       unit: "",
       minQuantity: 1,

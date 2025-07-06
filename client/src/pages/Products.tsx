@@ -12,7 +12,7 @@ import type { Category, ProductWithCategory } from "@shared/schema";
 export default function Products() {
   const [location] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("name");
 
   // Parse URL parameters
@@ -33,7 +33,7 @@ export default function Products() {
     queryKey: ["/api/products", selectedCategory || undefined, searchTerm || undefined],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (selectedCategory) params.set("categoryId", selectedCategory);
+      if (selectedCategory && selectedCategory !== "all") params.set("categoryId", selectedCategory);
       if (searchTerm) params.set("search", searchTerm);
       
       const response = await fetch(`/api/products?${params.toString()}`);
@@ -47,7 +47,7 @@ export default function Products() {
   const handleSearch = () => {
     const params = new URLSearchParams();
     if (searchTerm) params.set("search", searchTerm);
-    if (selectedCategory) params.set("category", selectedCategory);
+    if (selectedCategory && selectedCategory !== "all") params.set("category", selectedCategory);
     
     window.history.pushState({}, "", `/products?${params.toString()}`);
   };
@@ -98,7 +98,7 @@ export default function Products() {
                     <SelectValue placeholder="All Categories" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Categories</SelectItem>
+                    <SelectItem value="all">All Categories</SelectItem>
                     {categories.map((category) => (
                       <SelectItem key={category.id} value={category.id.toString()}>
                         {category.name}

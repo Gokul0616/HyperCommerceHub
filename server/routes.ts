@@ -1,8 +1,23 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import session from "express-session";
 import { storage } from "./storage";
 import { insertUserSchema, insertCategorySchema, insertProductSchema, insertInventorySchema, insertOrderSchema, insertCartSchema } from "@shared/schema";
 import { z } from "zod";
+
+// Extend Request interface to include session
+declare module "express-session" {
+  interface SessionData {
+    user?: {
+      id: number;
+      email: string;
+      firstName: string;
+      lastName: string;
+      businessName: string;
+      role: string;
+    };
+  }
+}
 
 // Login schema
 const loginSchema = z.object({
@@ -11,7 +26,7 @@ const loginSchema = z.object({
 });
 
 // Middleware to check if user is authenticated
-const requireAuth = (req: any, res: any, next: any) => {
+const requireAuth = (req: Request, res: Response, next: any) => {
   if (!req.session?.user) {
     return res.status(401).json({ message: "Authentication required" });
   }
@@ -19,7 +34,7 @@ const requireAuth = (req: any, res: any, next: any) => {
 };
 
 // Middleware to check if user is admin
-const requireAdmin = (req: any, res: any, next: any) => {
+const requireAdmin = (req: Request, res: Response, next: any) => {
   if (!req.session?.user || req.session.user.role !== 'admin') {
     return res.status(403).json({ message: "Admin access required" });
   }
@@ -28,7 +43,7 @@ const requireAdmin = (req: any, res: any, next: any) => {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Session middleware
-  app.use(require('express-session')({
+  app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: false,
@@ -208,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cart routes
   app.get('/api/cart', requireAuth, async (req, res) => {
     try {
-      const cartItems = await storage.getCartByUserId(req.session.user.id);
+      const cartItems = await storage.getCartByUserId(req.session.user!.id);
       res.json(cartItems);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -219,7 +234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const cartData = insertCartSchema.parse({
         ...req.body,
-        userId: req.session.user.id,
+        userId: req.session.user!.id,
       });
       const cartItem = await storage.addToCart(cartData);
       res.json(cartItem);
@@ -251,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/cart', requireAuth, async (req, res) => {
     try {
-      await storage.clearCart(req.session.user.id);
+      await storage.clearCart(req.session.user!.id);
       res.json({ message: "Cart cleared" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -261,7 +276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Order routes
   app.post('/api/orders', requireAuth, async (req, res) => {
     try {
-      const cartItems = await storage.getCartByUserId(req.session.user.id);
+      const cartItems = await storage.getCartByUserId(req.session.user!.id);
       if (cartItems.length === 0) {
         return res.status(400).json({ message: "Cart is empty" });
       }
@@ -272,7 +287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const orderNumber = `HP${Date.now()}`;
       const orderData = {
-        userId: req.session.user.id,
+        userId: req.session.user!.id,
         orderNumber,
         totalAmount: totalAmount.toString(),
         deliveryAddress: req.body.deliveryAddress,
@@ -290,7 +305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       await storage.createOrderItems(orderItems);
-      await storage.clearCart(req.session.user.id);
+      await storage.clearCart(req.session.user!.id);
 
       res.json(order);
     } catch (error: any) {
@@ -300,7 +315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/orders', requireAuth, async (req, res) => {
     try {
-      const orders = await storage.getOrdersByUserId(req.session.user.id);
+      const orders = await storage.getOrdersByUserId(req.session.user!.id);
       res.json(orders);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -316,7 +331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check if user owns this order or is admin
-      if (order.userId !== req.session.user.id && req.session.user.role !== 'admin') {
+      if (order.userId !== req.session.user!.id && req.session.user!.role !== 'admin') {
         return res.status(403).json({ message: "Access denied" });
       }
       

@@ -143,22 +143,23 @@ export class DatabaseStorage implements IStorage {
 
   // Product operations
   async getProducts(categoryId?: number, search?: string): Promise<ProductWithCategory[]> {
-    let query = db
+    let whereConditions = [eq(products.isActive, true)];
+
+    if (categoryId) {
+      whereConditions.push(eq(products.categoryId, categoryId));
+    }
+
+    if (search) {
+      whereConditions.push(like(products.name, `%${search}%`));
+    }
+
+    const results = await db
       .select()
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .leftJoin(inventory, eq(products.id, inventory.productId))
-      .where(eq(products.isActive, true));
-
-    if (categoryId) {
-      query = query.where(eq(products.categoryId, categoryId));
-    }
-
-    if (search) {
-      query = query.where(like(products.name, `%${search}%`));
-    }
-
-    const results = await query.orderBy(asc(products.name));
+      .where(and(...whereConditions))
+      .orderBy(asc(products.name));
     
     return results.map(row => ({
       ...row.products,
