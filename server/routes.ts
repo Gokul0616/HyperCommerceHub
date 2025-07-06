@@ -59,6 +59,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       secret: process.env.SESSION_SECRET || "hyperpure-demo-secret-key",
       resave: false,
       saveUninitialized: false,
+      store: new memStore({
+        checkPeriod: 86400000 // prune expired entries every 24h
+      }),
       cookie: { 
         secure: false, 
         httpOnly: true,
