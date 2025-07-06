@@ -7,33 +7,62 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { 
-  BarChart3, 
-  Package, 
-  ShoppingCart, 
-  Users, 
-  TrendingUp, 
-  Plus, 
-  Edit, 
-  Trash2, 
+import {
+  BarChart3,
+  Package,
+  ShoppingCart,
+  Users,
+  TrendingUp,
+  Plus,
+  Edit,
+  Trash2,
   Eye,
   AlertTriangle,
-  CheckCircle,
-  Clock,
-  Truck
 } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
-import { insertProductSchema, insertCategorySchema, type Category, type ProductWithCategory, type OrderWithItems } from "@shared/schema";
+import {
+  insertProductSchema,
+  insertCategorySchema,
+  type Category,
+  type ProductWithCategory,
+  type OrderWithItems,
+} from "@shared/schema";
 import { z } from "zod";
 
 // Form schemas
@@ -43,16 +72,24 @@ const productFormSchema = insertProductSchema.extend({
 
 const categoryFormSchema = insertCategorySchema;
 
+const stockFormSchema = z.object({
+  quantity: z.number().min(0, "Stock quantity cannot be negative"),
+  lowStockThreshold: z.number().min(0, "Low stock threshold cannot be negative").optional(),
+});
+
 export default function Admin() {
   const { user, isAdmin } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [isStockDialogOpen, setIsStockDialogOpen] = useState(false);
+  const [isOrderDetailsDialogOpen, setIsOrderDetailsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductWithCategory | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<ProductWithCategory | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
 
   // Redirect if not admin
   if (!isAdmin) {
@@ -102,6 +139,14 @@ export default function Admin() {
       name: "",
       description: "",
       icon: "package",
+    },
+  });
+
+  const stockForm = useForm<z.infer<typeof stockFormSchema>>({
+    resolver: zodResolver(stockFormSchema),
+    defaultValues: {
+      quantity: 0,
+      lowStockThreshold: 10,
     },
   });
 
@@ -172,6 +217,27 @@ export default function Admin() {
     },
   });
 
+  const toggleProductStatus = useMutation({
+    mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
+      await apiRequest("PUT", `/api/products/${id}/status`, { isActive });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/low-stock"] });
+      toast({
+        title: "Product status updated",
+        description: "The product status has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const createCategory = useMutation({
     mutationFn: async (data: z.infer<typeof categoryFormSchema>) => {
       await apiRequest("POST", "/api/categories", data);
@@ -214,6 +280,48 @@ export default function Admin() {
     },
   });
 
+  const fetchOrderDetails = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("GET", `/api/orders/${id}`);
+      return response;
+    },
+    onSuccess: (data: OrderWithItems) => {
+      setSelectedOrder(data);
+      setIsOrderDetailsDialogOpen(true);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateStock = useMutation({
+    mutationFn: async ({ productId, quantity, lowStockThreshold }: { productId: number; quantity: number; lowStockThreshold?: number }) => {
+      await apiRequest("PUT", `/api/inventory/${productId}`, { quantity, lowStockThreshold });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/low-stock"] });
+      setIsStockDialogOpen(false);
+      setSelectedProduct(null);
+      stockForm.reset();
+      toast({
+        title: "Stock updated",
+        description: "The product stock has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Event handlers
   const handleEditProduct = (product: ProductWithCategory) => {
     setEditingProduct(product);
@@ -240,6 +348,15 @@ export default function Admin() {
     setIsCategoryDialogOpen(true);
   };
 
+  const handleUpdateStock = (product: ProductWithCategory) => {
+    setSelectedProduct(product);
+    stockForm.reset({
+      quantity: product.inventory?.quantity || 0,
+      lowStockThreshold: product.inventory?.lowStockThreshold || 10,
+    });
+    setIsStockDialogOpen(true);
+  };
+
   const onProductSubmit = (data: z.infer<typeof productFormSchema>) => {
     if (editingProduct) {
       updateProduct.mutate(data);
@@ -250,6 +367,16 @@ export default function Admin() {
 
   const onCategorySubmit = (data: z.infer<typeof categoryFormSchema>) => {
     createCategory.mutate(data);
+  };
+
+  const onStockSubmit = (data: z.infer<typeof stockFormSchema>) => {
+    if (selectedProduct) {
+      updateStock.mutate({
+        productId: selectedProduct.id,
+        quantity: data.quantity,
+        lowStockThreshold: data.lowStockThreshold,
+      });
+    }
   };
 
   const statusColors = {
@@ -276,43 +403,51 @@ export default function Admin() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Total Orders</p>
-                  <p className="text-2xl font-bold text-primary">{stats?.totalOrders || 0}</p>
+                  <p className="text-2xl font-bold text-primary">
+                    {stats?.totalOrders || 0}
+                  </p>
                 </div>
                 <ShoppingCart className="w-8 h-8 text-primary/60" />
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Total Revenue</p>
-                  <p className="text-2xl font-bold text-green-600">₹{stats?.totalRevenue?.toLocaleString() || 0}</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    ₹{stats?.totalRevenue?.toLocaleString() || 0}
+                  </p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-green-600/60" />
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Active Products</p>
-                  <p className="text-2xl font-bold text-blue-600">{stats?.totalProducts || 0}</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {stats?.totalProducts || 0}
+                  </p>
                 </div>
                 <Package className="w-8 h-8 text-blue-600/60" />
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Total Customers</p>
-                  <p className="text-2xl font-bold text-purple-600">{stats?.totalCustomers || 0}</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {stats?.totalCustomers || 0}
+                  </p>
                 </div>
                 <Users className="w-8 h-8 text-purple-600/60" />
               </div>
@@ -335,12 +470,19 @@ export default function Admin() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {lowStockProducts.slice(0, 5).map((product) => (
-                  <Badge key={product.id} variant="outline" className="border-orange-300 text-orange-800">
+                  <Badge
+                    key={product.id}
+                    variant="outline"
+                    className="border-orange-300 text-orange-800"
+                  >
                     {product.name} ({product.inventory?.quantity} left)
                   </Badge>
                 ))}
                 {lowStockProducts.length > 5 && (
-                  <Badge variant="outline" className="border-orange-300 text-orange-800">
+                  <Badge
+                    variant="outline"
+                    className="border-orange-300 text-orange-800"
+                  >
                     +{lowStockProducts.length - 5} more
                   </Badge>
                 )}
@@ -361,13 +503,20 @@ export default function Admin() {
           {/* Products Tab */}
           <TabsContent value="products" className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Product Management</h2>
-              <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Product Management
+              </h2>
+              <Dialog
+                open={isProductDialogOpen}
+                onOpenChange={setIsProductDialogOpen}
+              >
                 <DialogTrigger asChild>
-                  <Button onClick={() => {
-                    setEditingProduct(null);
-                    productForm.reset();
-                  }}>
+                  <Button
+                    onClick={() => {
+                      setEditingProduct(null);
+                      productForm.reset();
+                    }}
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Product
                   </Button>
@@ -379,7 +528,10 @@ export default function Admin() {
                     </DialogTitle>
                   </DialogHeader>
                   <Form {...productForm}>
-                    <form onSubmit={productForm.handleSubmit(onProductSubmit)} className="space-y-4">
+                    <form
+                      onSubmit={productForm.handleSubmit(onProductSubmit)}
+                      className="space-y-4"
+                    >
                       <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={productForm.control}
@@ -400,7 +552,12 @@ export default function Admin() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Category</FormLabel>
-                              <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value.toString()}>
+                              <Select
+                                onValueChange={(value) =>
+                                  field.onChange(parseInt(value))
+                                }
+                                value={field?.value?.toString()}
+                              >
                                 <FormControl>
                                   <SelectTrigger>
                                     <SelectValue placeholder="Select a category" />
@@ -408,7 +565,10 @@ export default function Admin() {
                                 </FormControl>
                                 <SelectContent>
                                   {categories.map((category) => (
-                                    <SelectItem key={category.id} value={category.id.toString()}>
+                                    <SelectItem
+                                      key={category.id}
+                                      value={category.id.toString()}
+                                    >
                                       {category.name}
                                     </SelectItem>
                                   ))}
@@ -419,7 +579,7 @@ export default function Admin() {
                           )}
                         />
                       </div>
-                      
+
                       <FormField
                         control={productForm.control}
                         name="description"
@@ -433,7 +593,7 @@ export default function Admin() {
                           </FormItem>
                         )}
                       />
-                      
+
                       <div className="grid grid-cols-3 gap-4">
                         <FormField
                           control={productForm.control}
@@ -455,7 +615,10 @@ export default function Admin() {
                             <FormItem>
                               <FormLabel>Unit</FormLabel>
                               <FormControl>
-                                <Input {...field} placeholder="kg, pieces, liters" />
+                                <Input
+                                  {...field}
+                                  placeholder="kg, pieces, liters"
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -468,14 +631,20 @@ export default function Admin() {
                             <FormItem>
                               <FormLabel>Min Quantity</FormLabel>
                               <FormControl>
-                                <Input {...field} type="number" onChange={(e) => field.onChange(parseInt(e.target.value))} />
+                                <Input
+                                  {...field}
+                                  type="number"
+                                  onChange={(e) =>
+                                    field.onChange(parseInt(e.target.value))
+                                  }
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
                       </div>
-                      
+
                       <FormField
                         control={productForm.control}
                         name="imageUrl"
@@ -489,12 +658,21 @@ export default function Admin() {
                           </FormItem>
                         )}
                       />
-                      
+
                       <div className="flex justify-end space-x-2">
-                        <Button type="button" variant="outline" onClick={() => setIsProductDialogOpen(false)}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsProductDialogOpen(false)}
+                        >
                           Cancel
                         </Button>
-                        <Button type="submit" disabled={createProduct.isPending || updateProduct.isPending}>
+                        <Button
+                          type="submit"
+                          disabled={
+                            createProduct.isPending || updateProduct.isPending
+                          }
+                        >
                           {editingProduct ? "Update" : "Create"} Product
                         </Button>
                       </div>
@@ -524,7 +702,11 @@ export default function Admin() {
                           <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 bg-gray-100 rounded-lg">
                               {product.imageUrl ? (
-                                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-lg" />
+                                <img
+                                  src={product.imageUrl}
+                                  alt={product.name}
+                                  className="w-full h-full object-cover rounded-lg"
+                                />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
                                   <Package className="w-4 h-4 text-gray-400" />
@@ -533,7 +715,9 @@ export default function Admin() {
                             </div>
                             <div>
                               <div className="font-medium">{product.name}</div>
-                              <div className="text-sm text-gray-500">{product.unit}</div>
+                              <div className="text-sm text-gray-500">
+                                {product.unit}
+                              </div>
                             </div>
                           </div>
                         </TableCell>
@@ -541,24 +725,54 @@ export default function Admin() {
                         <TableCell>₹{product.price}</TableCell>
                         <TableCell>
                           {product.inventory ? (
-                            <span className={product.inventory.quantity <= product.inventory.lowStockThreshold ? "text-orange-600" : ""}>
+                            <span
+                              className={
+                                product.inventory.quantity <=
+                                product.inventory.lowStockThreshold
+                                  ? "text-orange-600"
+                                  : ""
+                              }
+                            >
                               {product.inventory.quantity}
                             </span>
-                          ) : "N/A"}
+                          ) : (
+                            "N/A"
+                          )}
                         </TableCell>
                         <TableCell>
-                          <Badge className={product.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                            {product.isActive ? "Active" : "Inactive"}
-                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              toggleProductStatus.mutate({
+                                id: product.id,
+                                isActive: !product.isActive,
+                              })
+                            }
+                            disabled={toggleProductStatus.isPending}
+                          >
+                            {product.isActive ? "Deactivate" : "Activate"}
+                          </Button>
                         </TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
-                            <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditProduct(product)}
+                            >
                               <Edit className="w-4 h-4" />
                             </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleUpdateStock(product)}
+                            >
+                              <Package className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => deleteProduct.mutate(product.id)}
                               disabled={deleteProduct.isPending}
                             >
@@ -572,18 +786,87 @@ export default function Admin() {
                 </Table>
               </CardContent>
             </Card>
+
+            {/* Stock Update Dialog */}
+            <Dialog open={isStockDialogOpen} onOpenChange={setIsStockDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Update Stock for {selectedProduct?.name}</DialogTitle>
+                </DialogHeader>
+                <Form {...stockForm}>
+                  <form
+                    onSubmit={stockForm.handleSubmit(onStockSubmit)}
+                    className="space-y-4"
+                  >
+                    <FormField
+                      control={stockForm.control}
+                      name="quantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Stock Quantity</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={stockForm.control}
+                      name="lowStockThreshold"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Low Stock Threshold (Optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex justify-end space-x-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsStockDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={updateStock.isPending}>
+                        Update Stock
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* Categories Tab */}
           <TabsContent value="categories" className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Category Management</h2>
-              <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Category Management
+              </h2>
+              <Dialog
+                open={isCategoryDialogOpen}
+                onOpenChange={setIsCategoryDialogOpen}
+              >
                 <DialogTrigger asChild>
-                  <Button onClick={() => {
-                    setEditingCategory(null);
-                    categoryForm.reset();
-                  }}>
+                  <Button
+                    onClick={() => {
+                      setEditingCategory(null);
+                      categoryForm.reset();
+                    }}
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Category
                   </Button>
@@ -593,7 +876,10 @@ export default function Admin() {
                     <DialogTitle>Add New Category</DialogTitle>
                   </DialogHeader>
                   <Form {...categoryForm}>
-                    <form onSubmit={categoryForm.handleSubmit(onCategorySubmit)} className="space-y-4">
+                    <form
+                      onSubmit={categoryForm.handleSubmit(onCategorySubmit)}
+                      className="space-y-4"
+                    >
                       <FormField
                         control={categoryForm.control}
                         name="name"
@@ -607,7 +893,7 @@ export default function Admin() {
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={categoryForm.control}
                         name="description"
@@ -621,38 +907,60 @@ export default function Admin() {
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={categoryForm.control}
                         name="icon"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Icon</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select an icon" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="apple">Apple (Fruits)</SelectItem>
-                                <SelectItem value="milk">Milk (Dairy)</SelectItem>
-                                <SelectItem value="egg">Egg (Poultry)</SelectItem>
-                                <SelectItem value="wheat">Wheat (Grains)</SelectItem>
-                                <SelectItem value="droplets">Droplets (Liquids)</SelectItem>
-                                <SelectItem value="package">Package (General)</SelectItem>
+                                <SelectItem value="apple">
+                                  Apple (Fruits)
+                                </SelectItem>
+                                <SelectItem value="milk">
+                                  Milk (Dairy)
+                                </SelectItem>
+                                <SelectItem value="egg">
+                                  Egg (Poultry)
+                                </SelectItem>
+                                <SelectItem value="wheat">
+                                  Wheat (Grains)
+                                </SelectItem>
+                                <SelectItem value="droplets">
+                                  Droplets (Liquids)
+                                </SelectItem>
+                                <SelectItem value="package">
+                                  Package (General)
+                                </SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                      
+
                       <div className="flex justify-end space-x-2">
-                        <Button type="button" variant="outline" onClick={() => setIsCategoryDialogOpen(false)}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsCategoryDialogOpen(false)}
+                        >
                           Cancel
                         </Button>
-                        <Button type="submit" disabled={createCategory.isPending}>
+                        <Button
+                          type="submit"
+                          disabled={createCategory.isPending}
+                        >
                           Create Category
                         </Button>
                       </div>
@@ -673,10 +981,16 @@ export default function Admin() {
                         </div>
                         <div>
                           <h3 className="font-semibold">{category.name}</h3>
-                          <p className="text-sm text-gray-600">{category.description}</p>
+                          <p className="text-sm text-gray-600">
+                            {category.description}
+                          </p>
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => handleEditCategory(category)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditCategory(category)}
+                      >
                         <Edit className="w-4 h-4" />
                       </Button>
                     </div>
@@ -688,8 +1002,10 @@ export default function Admin() {
 
           {/* Orders Tab */}
           <TabsContent value="orders" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Order Management</h2>
-            
+            <h2 className="text-2xl font-bold text-gray-900">
+              Order Management
+            </h2>
+
             <Card>
               <CardContent className="p-0">
                 <Table>
@@ -707,14 +1023,20 @@ export default function Admin() {
                   <TableBody>
                     {orders.map((order) => (
                       <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                        <TableCell className="font-medium">
+                          {order.orderNumber}
+                        </TableCell>
                         <TableCell>{order.user.businessName}</TableCell>
                         <TableCell>{order.items.length} items</TableCell>
-                        <TableCell>₹{parseFloat(order.totalAmount).toFixed(2)}</TableCell>
                         <TableCell>
-                          <Select 
-                            value={order.status} 
-                            onValueChange={(status) => updateOrderStatus.mutate({ id: order.id, status })}
+                          ₹{parseFloat(order.totalAmount).toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={order.status}
+                            onValueChange={(status) =>
+                              updateOrderStatus.mutate({ id: order.id, status })
+                            }
                           >
                             <SelectTrigger className="w-32">
                               <SelectValue />
@@ -728,9 +1050,15 @@ export default function Admin() {
                             </SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell>{format(new Date(order.createdAt), "MMM dd, yyyy")}</TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm">
+                          {format(new Date(order.createdAt), "MMM dd, yyyy")}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => fetchOrderDetails.mutate(order.id)}
+                          >
                             <Eye className="w-4 h-4" />
                           </Button>
                         </TableCell>
@@ -740,12 +1068,77 @@ export default function Admin() {
                 </Table>
               </CardContent>
             </Card>
+
+            {/* Order Details Dialog */}
+            <Dialog
+              open={isOrderDetailsDialogOpen}
+              onOpenChange={setIsOrderDetailsDialogOpen}
+            >
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Order Details - {selectedOrder?.orderNumber}</DialogTitle>
+                </DialogHeader>
+                {selectedOrder && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold">Customer Information</h3>
+                      <p>Business Name: {selectedOrder.user.businessName}</p>
+                      <p>Email: {selectedOrder.user.email}</p>
+                      <p>Delivery Address: {selectedOrder.deliveryAddress}</p>
+                      <p>Notes: {selectedOrder.notes || "N/A"}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">Order Items</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Product</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead>Unit Price</TableHead>
+                            <TableHead>Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedOrder.items.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell>{item.product.name}</TableCell>
+                              <TableCell>{item.quantity}</TableCell>
+                              <TableCell>₹{parseFloat(item.price).toFixed(2)}</TableCell>
+                              <TableCell>₹{parseFloat(item.total).toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <div className="flex justify-between">
+                      <div>
+                        <p>Order Date: {format(new Date(selectedOrder.createdAt), "MMM dd, yyyy")}</p>
+                        <p>Status: <Badge className={statusColors[selectedOrder.status as keyof typeof statusColors]}>{selectedOrder.status}</Badge></p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">Total: ₹{parseFloat(selectedOrder.totalAmount).toFixed(2)}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsOrderDetailsDialogOpen(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Analytics & Reports</h2>
-            
+            <h2 className="text-2xl font-bold text-gray-900">
+              Analytics & Reports
+            </h2>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
@@ -754,14 +1147,27 @@ export default function Admin() {
                 <CardContent>
                   <div className="space-y-4">
                     {stats?.recentOrders?.slice(0, 5).map((order) => (
-                      <div key={order.id} className="flex items-center justify-between">
+                      <div
+                        key={order.id}
+                        className="flex items-center justify-between"
+                      >
                         <div>
                           <p className="font-medium">{order.orderNumber}</p>
-                          <p className="text-sm text-gray-600">{order.user.businessName}</p>
+                          <p className="text-sm text-gray-600">
+                            {order.user.businessName}
+                          </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-medium">₹{parseFloat(order.totalAmount).toFixed(2)}</p>
-                          <Badge className={statusColors[order.status as keyof typeof statusColors]}>
+                          <p className="font-medium">
+                            ₹{parseFloat(order.totalAmount).toFixed(2)}
+                          </p>
+                          <Badge
+                            className={
+                              statusColors[
+                                order.status as keyof typeof statusColors
+                              ]
+                            }
+                          >
                             {order.status}
                           </Badge>
                         </div>
@@ -770,7 +1176,7 @@ export default function Admin() {
                   </div>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardHeader>
                   <CardTitle>Top Categories</CardTitle>
@@ -778,11 +1184,18 @@ export default function Admin() {
                 <CardContent>
                   <div className="space-y-4">
                     {categories.slice(0, 5).map((category) => {
-                      const categoryProducts = products.filter(p => p.categoryId === category.id);
+                      const categoryProducts = products.filter(
+                        (p) => p.categoryId === category.id,
+                      );
                       return (
-                        <div key={category.id} className="flex items-center justify-between">
+                        <div
+                          key={category.id}
+                          className="flex items-center justify-between"
+                        >
                           <span className="font-medium">{category.name}</span>
-                          <span className="text-gray-600">{categoryProducts.length} products</span>
+                          <span className="text-gray-600">
+                            {categoryProducts.length} products
+                          </span>
                         </div>
                       );
                     })}
