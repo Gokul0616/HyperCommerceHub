@@ -24,7 +24,8 @@ import {
   type InsertCart,
   type CartWithProduct,
 } from "@shared/schema";
-import { db } from "./db";
+import { db, isDemoMode } from "./db";
+import { DemoStorage } from "./demoStorage";
 import { eq, and, desc, asc, like, sql, count, sum } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
@@ -532,4 +533,5 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+// Export the appropriate storage instance
+export const storage = isDemoMode ? new DemoStorage() : new DatabaseStorage();
