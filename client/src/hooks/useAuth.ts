@@ -4,11 +4,13 @@ import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
 
 export function useAuth() {
-  const { data: user, isLoading } = useQuery<User | null>({
+  const { data: user, isLoading, error } = useQuery<User | null>({
     queryKey: ["/api/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: "always", // Always refetch when component mounts
+    refetchOnWindowFocus: false,
   });
 
   return {
