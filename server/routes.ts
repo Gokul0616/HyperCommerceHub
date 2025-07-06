@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import MemoryStore from "memorystore";
 import { storage } from "./storage";
 import {
   insertUserSchema,
@@ -11,6 +12,9 @@ import {
   insertCartSchema,
 } from "@shared/schema";
 import { z } from "zod";
+
+// Create MemoryStore instance for demo mode
+const memStore = MemoryStore(session);
 
 // Extend Request interface to include session
 declare module "express-session" {
