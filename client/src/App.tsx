@@ -39,7 +39,7 @@ function Router() {
           <Route path="/products/:id" component={ProductDetail} />
           <Route path="/cart" component={Cart} />
           <Route path="/orders" component={Orders} />
-          <Route path="/admin" component={Admin} />
+          {user?.role === 'admin' && <Route path="/admin" component={Admin} />}
           <Route component={NotFound} />
         </Switch>
       </main>
