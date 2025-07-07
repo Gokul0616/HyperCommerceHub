@@ -53,7 +53,16 @@ const requireAdmin = (req: Request, res: Response, next: any) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Session middleware with improved persistence
+  // Session debugging middleware
+  app.use((req, res, next) => {
+    console.log(`[Session Debug] ${req.method} ${req.path}`);
+    console.log(`[Session Debug] Session ID: ${req.sessionID || 'none'}`);
+    console.log(`[Session Debug] Session User: ${req.session?.user ? JSON.stringify(req.session.user, null, 2) : 'none'}`);
+    console.log(`[Session Debug] Cookies: ${JSON.stringify(req.headers.cookie || 'none')}`);
+    next();
+  });
+
+  // Session middleware with improved persistence for localhost development
   app.use(
     session({
       secret: process.env.SESSION_SECRET || "hyperpure-demo-secret-key",
@@ -63,10 +72,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         checkPeriod: 86400000 // prune expired entries every 24h
       }),
       cookie: { 
-        secure: false, 
-        httpOnly: true,
+        secure: false, // Must be false for localhost
+        httpOnly: false, // Allow client-side access for debugging
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        sameSite: 'lax'
+        sameSite: 'lax',
+        domain: undefined, // Let browser set automatically for localhost
+        path: '/' // Explicit path
       },
       rolling: true, // Reset expiration on each request
       name: 'hyperpure.sid', // Custom session name
