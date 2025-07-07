@@ -117,15 +117,57 @@ class HyperPureAPITester:
 
         return True
 
-    def test_order_details(self, order_id):
-        """Test getting order details"""
-        success, response = self.run_test(
-            "Order Details",
+    def test_products(self):
+        """Test getting products"""
+        success, products = self.run_test(
+            "Get Products",
             "GET",
-            f"orders/{order_id}",
+            "products",
             200
         )
-        return success, response
+        return success, products
+        
+    def test_categories(self):
+        """Test getting categories"""
+        success, categories = self.run_test(
+            "Get Categories",
+            "GET",
+            "categories",
+            200
+        )
+        return success, categories
+        
+    def test_add_to_cart(self, product_id, quantity=1):
+        """Test adding a product to cart"""
+        success, cart_item = self.run_test(
+            "Add to Cart",
+            "POST",
+            "cart",
+            200,
+            data={"productId": product_id, "quantity": quantity}
+        )
+        return success, cart_item
+        
+    def test_get_cart(self):
+        """Test getting cart items"""
+        success, cart = self.run_test(
+            "Get Cart",
+            "GET",
+            "cart",
+            200
+        )
+        return success, cart
+        
+    def test_checkout(self, delivery_address="Test Address"):
+        """Test checkout process"""
+        success, order = self.run_test(
+            "Checkout",
+            "POST",
+            "orders",
+            200,
+            data={"deliveryAddress": delivery_address, "notes": "Test order"}
+        )
+        return success, order
 
 def main():
     # Setup
