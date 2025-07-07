@@ -64,7 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }),
       cookie: { 
         secure: false, // Must be false for localhost
-        httpOnly: true, // More secure, but might need to be false for debugging
+        httpOnly: false, // Allow client-side access for debugging 
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         sameSite: 'lax',
         domain: undefined, // Let browser set automatically for localhost
