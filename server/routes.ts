@@ -53,15 +53,6 @@ const requireAdmin = (req: Request, res: Response, next: any) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Session debugging middleware
-  app.use((req, res, next) => {
-    console.log(`[Session Debug] ${req.method} ${req.path}`);
-    console.log(`[Session Debug] Session ID: ${req.sessionID || 'none'}`);
-    console.log(`[Session Debug] Session User: ${req.session?.user ? JSON.stringify(req.session.user, null, 2) : 'none'}`);
-    console.log(`[Session Debug] Cookies: ${JSON.stringify(req.headers.cookie || 'none')}`);
-    next();
-  });
-
   // Session middleware with improved persistence for localhost development
   app.use(
     session({
@@ -83,6 +74,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       name: 'hyperpure.sid', // Custom session name
     }),
   );
+
+  // Session debugging middleware - AFTER session middleware
+  app.use((req, res, next) => {
+    console.log(`[Session Debug] ${req.method} ${req.path}`);
+    console.log(`[Session Debug] Session ID: ${req.sessionID || 'none'}`);
+    console.log(`[Session Debug] Session User: ${req.session?.user ? JSON.stringify(req.session.user, null, 2) : 'none'}`);
+    console.log(`[Session Debug] Cookies: ${JSON.stringify(req.headers.cookie || 'none')}`);
+    next();
+  });
 
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
