@@ -18,31 +18,35 @@ const statusColors = {
 };
 
 export default function OrderCard({ order }: OrderCardProps) {
-  const statusColor = statusColors[order.status as keyof typeof statusColors] || "bg-gray-100 text-gray-800";
+  const statusColor =
+    statusColors[order.status as keyof typeof statusColors] ||
+    "bg-gray-100 text-gray-800";
 
   return (
     <Card>
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
-            <CardTitle className="text-lg">Order #{order.orderNumber}</CardTitle>
+            <CardTitle className="text-lg">
+              Order #{order.orderNumber}
+            </CardTitle>
             <p className="text-sm text-gray-600 mt-1 flex items-center">
               <Calendar className="w-4 h-4 mr-1" />
               {format(new Date(order.createdAt), "MMM dd, yyyy 'at' h:mm a")}
             </p>
           </div>
           <Badge className={statusColor}>
-            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+            {order?.status?.charAt(0).toUpperCase() + order?.status?.slice(1)}
           </Badge>
         </div>
       </CardHeader>
-      
+
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Package className="w-4 h-4 text-gray-600" />
             <span className="text-sm text-gray-600">
-              {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+              {order.items.length} item{order?.items?.length !== 1 ? "s" : ""}
             </span>
           </div>
           <div className="flex items-center space-x-2">
@@ -52,10 +56,13 @@ export default function OrderCard({ order }: OrderCardProps) {
             </span>
           </div>
         </div>
-        
+
         <div className="space-y-2">
           {order.items.slice(0, 3).map((item) => (
-            <div key={item.id} className="flex justify-between items-center text-sm">
+            <div
+              key={item.id}
+              className="flex justify-between items-center text-sm"
+            >
               <span className="text-gray-700">
                 {item.product.name} x {item.quantity}
               </span>
@@ -70,25 +77,28 @@ export default function OrderCard({ order }: OrderCardProps) {
             </div>
           )}
         </div>
-        
+
         {order.deliveryAddress && (
           <div className="flex items-start space-x-2">
             <MapPin className="w-4 h-4 text-gray-600 mt-0.5" />
-            <span className="text-sm text-gray-600">{order.deliveryAddress}</span>
+            <span className="text-sm text-gray-600">
+              {order.deliveryAddress}
+            </span>
           </div>
         )}
-        
+
         {order.deliveryDate && (
           <div className="text-sm text-gray-600">
-            Expected delivery: {format(new Date(order.deliveryDate), "MMM dd, yyyy")}
+            Expected delivery:{" "}
+            {format(new Date(order.deliveryDate), "MMM dd, yyyy")}
           </div>
         )}
-        
+
         <div className="flex space-x-2 pt-2">
           <Button variant="outline" size="sm">
             View Details
           </Button>
-          {order.status === 'delivered' && (
+          {order.status === "delivered" && (
             <Button variant="outline" size="sm">
               Reorder
             </Button>

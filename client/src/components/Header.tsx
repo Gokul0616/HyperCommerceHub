@@ -4,17 +4,25 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Leaf, ShoppingCart, User, Settings, LogOut, Shield } from "lucide-react";
+import {
+  Leaf,
+  ShoppingCart,
+  User,
+  Settings,
+  LogOut,
+  Shield,
+} from "lucide-react";
 
 export default function Header() {
   const { user, isAuthenticated, isAdmin } = useAuth();
+  console.log(isAdmin);
   const logout = useLogout();
   const [location] = useLocation();
 
@@ -23,7 +31,10 @@ export default function Header() {
     enabled: isAuthenticated,
   });
 
-  const cartCount = cartItems.reduce((total: number, item: any) => total + item.quantity, 0);
+  const cartCount = cartItems?.reduce(
+    (total: number, item: any) => total + item.quantity,
+    0
+  );
 
   return (
     <header className="bg-white shadow-lg sticky top-0 z-50">
@@ -39,14 +50,29 @@ export default function Header() {
 
           {/* Navigation */}
           <nav className="hidden md:flex space-x-8">
-            <Link href="/" className={`text-gray-700 hover:text-primary transition-colors ${location === '/' ? 'text-primary font-medium' : ''}`}>
+            <Link
+              href="/"
+              className={`text-gray-700 hover:text-primary transition-colors ${
+                location === "/" ? "text-primary font-medium" : ""
+              }`}
+            >
               Home
             </Link>
-            <Link href="/products" className={`text-gray-700 hover:text-primary transition-colors ${location === '/products' ? 'text-primary font-medium' : ''}`}>
+            <Link
+              href="/products"
+              className={`text-gray-700 hover:text-primary transition-colors ${
+                location === "/products" ? "text-primary font-medium" : ""
+              }`}
+            >
               Products
             </Link>
             {isAuthenticated && (
-              <Link href="/orders" className={`text-gray-700 hover:text-primary transition-colors ${location === '/orders' ? 'text-primary font-medium' : ''}`}>
+              <Link
+                href="/orders"
+                className={`text-gray-700 hover:text-primary transition-colors ${
+                  location === "/orders" ? "text-primary font-medium" : ""
+                }`}
+              >
                 Orders
               </Link>
             )}
@@ -74,7 +100,8 @@ export default function Header() {
                     <Button variant="ghost" size="icon">
                       <Avatar className="w-8 h-8">
                         <AvatarFallback className="bg-primary text-white">
-                          {user?.firstName?.[0]}{user?.lastName?.[0]}
+                          {user?.firstName?.[0]}
+                          {user?.lastName?.[0]}
                         </AvatarFallback>
                       </Avatar>
                     </Button>
