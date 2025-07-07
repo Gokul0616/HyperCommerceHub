@@ -117,6 +117,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.post("/api/auth/login", async (req, res) => {
     try {
+      console.log(`[Login Debug] Session before login - ID: ${req.sessionID || 'none'}, User: ${req.session?.user ? 'exists' : 'none'}`);
+      
       const { email, password } = loginSchema.parse(req.body);
       const user = await storage.getUserByEmail(email);
 
@@ -131,6 +133,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { password: _, ...userWithoutPassword } = user;
       req.session.user = userWithoutPassword;
+      
+      console.log(`[Login Debug] Session after setting user - ID: ${req.sessionID || 'none'}, User: ${req.session?.user ? JSON.stringify(req.session.user.email) : 'none'}`);
+      
+      // Force session save
+      req.session.save((err) => {
+        if (err) {
+          console.log(`[Login Debug] Session save error: ${err}`);
+        } else {
+          console.log(`[Login Debug] Session saved successfully`);
+        }
+      });
+      
       res.json({ user: userWithoutPassword });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
