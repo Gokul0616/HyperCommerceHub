@@ -57,14 +57,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(
     session({
       secret: process.env.SESSION_SECRET || "hyperpure-demo-secret-key",
-      resave: false,
-      saveUninitialized: false,
+      resave: true, // Force session save even if not modified
+      saveUninitialized: true, // Save new sessions
       store: new memStore({
         checkPeriod: 86400000 // prune expired entries every 24h
       }),
       cookie: { 
         secure: false, // Must be false for localhost
-        httpOnly: false, // Allow client-side access for debugging
+        httpOnly: true, // More secure, but might need to be false for debugging
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         sameSite: 'lax',
         domain: undefined, // Let browser set automatically for localhost
