@@ -171,7 +171,7 @@ class HyperPureAPITester:
 
 def main():
     # Setup
-    tester = HyperPureAPITester("http://localhost:5000")
+    tester = HyperPureAPITester("http://localhost:5001")
     
     print("=== Testing HyperPure API ===")
     
