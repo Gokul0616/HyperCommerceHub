@@ -193,22 +193,21 @@ def main():
     if not tester.test_admin_access():
         print("❌ Admin access test failed")
     
-    # Test 4: Get Admin Orders
-    print("\n=== Testing Admin Orders ===")
-    success, orders = tester.run_test(
-        "Admin Orders",
-        "GET",
-        "admin/orders",
-        200
-    )
+    # Test 4: Get Categories
+    print("\n=== Testing Categories ===")
+    success, categories = tester.test_categories()
+    if not success:
+        print("❌ Failed to get categories")
+    else:
+        print(f"✅ Found {len(categories)} categories")
     
-    # Test 5: Order Details
-    if success and orders and len(orders) > 0:
-        print("\n=== Testing Order Details ===")
-        order_id = orders[0]["id"]
-        success, order_details = tester.test_order_details(order_id)
-        if not success:
-            print(f"❌ Failed to get order details for order {order_id}")
+    # Test 5: Get Products
+    print("\n=== Testing Products ===")
+    success, products = tester.test_products()
+    if not success:
+        print("❌ Failed to get products")
+    else:
+        print(f"✅ Found {len(products)} products")
     
     # Test 6: Admin Logout
     print("\n=== Testing Admin Logout ===")
@@ -219,14 +218,52 @@ def main():
     print("\n=== Testing Customer Login ===")
     if not tester.login(tester.customer_credentials["email"], tester.customer_credentials["password"]):
         print("❌ Customer login failed")
+        return 1
     
     # Test 8: Get Current User (Customer)
     print("\n=== Testing Get Current User (Customer) ===")
     customer_user = tester.get_current_user()
     if not customer_user:
         print("❌ Failed to get customer user info")
+        return 1
     
-    # Test 9: Customer Logout
+    # Test 9: Add to Cart
+    print("\n=== Testing Add to Cart ===")
+    if products and len(products) > 0:
+        success, cart_item = tester.test_add_to_cart(products[0]["id"])
+        if not success:
+            print(f"❌ Failed to add product to cart")
+    
+    # Test 10: Get Cart
+    print("\n=== Testing Get Cart ===")
+    success, cart = tester.test_get_cart()
+    if not success:
+        print("❌ Failed to get cart")
+    else:
+        print(f"✅ Cart has {len(cart)} items")
+    
+    # Test 11: Checkout
+    print("\n=== Testing Checkout ===")
+    success, order = tester.test_checkout("Test Delivery Address")
+    if not success:
+        print("❌ Checkout failed")
+    else:
+        print(f"✅ Order created with ID: {order['id']}")
+    
+    # Test 12: Get Orders
+    print("\n=== Testing Get Orders ===")
+    success, orders = tester.run_test(
+        "Get Orders",
+        "GET",
+        "orders",
+        200
+    )
+    if not success:
+        print("❌ Failed to get orders")
+    else:
+        print(f"✅ Found {len(orders)} orders")
+    
+    # Test 13: Customer Logout
     print("\n=== Testing Customer Logout ===")
     if not tester.logout():
         print("❌ Customer logout failed")
